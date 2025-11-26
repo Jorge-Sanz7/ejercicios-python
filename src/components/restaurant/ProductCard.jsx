@@ -1,26 +1,45 @@
-// Archivo: src/components/restaurant/ProductCard.jsx (CÓDIGO COMPLETO)
+// Archivo: src/components/restaurant/ProductCard.jsx
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useCart } from '../../context/CartContext';
-// 1. Importamos los colores de la marca
 import { COLORS } from '../../utils/constants';
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
   
+  // El backend ahora envía "disponible: true/false"
+  // Si por alguna razón no llega, asumimos true para no romper nada.
+  const isAvailable = product.disponible !== false; 
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, !isAvailable && styles.cardDisabled]}>
       <View style={styles.infoContainer}>
-        <Text style={styles.name}>{product.name}</Text>
-        <Text style={styles.description} numberOfLines={2}>{product.description}</Text>
-        <Text style={styles.price}>${product.price.toFixed(2)}</Text>
+        <View style={styles.headerRow}>
+            <Text style={[styles.name, !isAvailable && styles.textDisabled]}>
+                {product.name}
+            </Text>
+            {!isAvailable && (
+                <View style={styles.badgeAgotado}>
+                    <Text style={styles.badgeText}>AGOTADO</Text>
+                </View>
+            )}
+        </View>
+        
+        <Text style={styles.description} numberOfLines={2}>
+            {product.description}
+        </Text>
+        
+        <Text style={[styles.price, !isAvailable && styles.textDisabled]}>
+            ${Number(product.precio_venta || product.price).toFixed(2)}
+        </Text>
       </View>
       
-      {/* Botón para añadir al carrito */}
+      {/* Botón: Si no hay stock, se deshabilita y cambia de color */}
       <TouchableOpacity 
-        style={styles.addButton}
-        onPress={() => addToCart(product)}
+        style={[styles.addButton, !isAvailable && styles.addButtonDisabled]}
+        onPress={() => isAvailable && addToCart(product)}
+        disabled={!isAvailable}
       >
         <Text style={styles.addButtonText}>+</Text>
       </TouchableOpacity>
@@ -31,7 +50,7 @@ const ProductCard = ({ product }) => {
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
-    backgroundColor: COLORS.background, // Fondo claro
+    backgroundColor: COLORS.background,
     borderRadius: 8,
     marginVertical: 8,
     marginHorizontal: 16,
@@ -43,28 +62,33 @@ const styles = StyleSheet.create({
     elevation: 2,
     alignItems: 'center',
     borderLeftWidth: 5,
-    borderLeftColor: COLORS.primary, // Detalle de la marca
+    borderLeftColor: COLORS.primary,
   },
-  infoContainer: {
-    flex: 1,
+  cardDisabled: {
+    backgroundColor: '#f0f0f0', // Fondo grisáceo
+    borderLeftColor: '#ccc',    // Borde gris
+    opacity: 0.8,
   },
-  name: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.text,
+  infoContainer: { flex: 1 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  name: { fontSize: 16, fontWeight: 'bold', color: COLORS.text },
+  textDisabled: { color: '#999', textDecorationLine: 'line-through' },
+  
+  description: { fontSize: 12, color: COLORS.secondaryText, marginVertical: 4 },
+  
+  price: { fontSize: 16, fontWeight: 'bold', color: COLORS.accent },
+  
+  badgeAgotado: {
+    backgroundColor: '#e74c3c',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 8,
   },
-  description: {
-    fontSize: 12,
-    color: COLORS.secondaryText,
-    marginVertical: 4,
-  },
-  price: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.accent, // Usamos el rojo de la marca para el precio
-  },
+  badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+
   addButton: {
-    backgroundColor: COLORS.success, // Usamos un color de éxito para el +
+    backgroundColor: COLORS.success,
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -72,11 +96,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 10,
   },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  }
+  addButtonDisabled: {
+    backgroundColor: '#ccc', // Botón gris
+  },
+  addButtonText: { color: '#fff', fontSize: 24, fontWeight: 'bold' }
 });
 
 export default ProductCard;

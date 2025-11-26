@@ -1,9 +1,8 @@
-// Archivo: src/navigation/AppNavigator.jsx
-
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-// 1. Importar todas las pantallas (los archivos .jsx que creaste)
+// 1. Importar la nueva pantalla Home
+import HomeScreen from '../screens/HomeScreen';
 import QRScannerScreen from '../screens/QRScannerScreen';
 import MenuScreen from '../screens/MenuScreen';
 import CartScreen from '../screens/CartScreen';
@@ -15,12 +14,12 @@ const Stack = createNativeStackNavigator();
 const AppNavigator = () => {
   return (
     <Stack.Navigator 
-      // La primera pantalla al abrir la app.
-      initialRouteName="QRScanner"
-      // Ocultamos la barra de título por defecto para un diseño más limpio
+      // CAMBIO: La pantalla inicial ahora es "Home"
+      initialRouteName="Home"
       screenOptions={{ headerShown: false }} 
     >
-      {/* 2. Definición de todas las Rutas del Flujo: */}
+      {/* 2. Definición de Rutas */}
+      <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="QRScanner" component={QRScannerScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />
       <Stack.Screen name="Cart" component={CartScreen} />
