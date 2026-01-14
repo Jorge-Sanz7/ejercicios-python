@@ -1,49 +1,25 @@
-import api from './api';
+const API_URL = 'TU_URL_DE_RENDER_AQUI'; // Asegúrate de que sea tu URL real
 
-// Enviar el pedido a cocina
-export const sendOrder = async (restaurantId, tableNumber, pin, cartItems, paymentMethod) => {
-  try {
-    const itemsFormatted = cartItems.map(item => ({
-      id_producto: item.productId,
-      cantidad: item.quantity
-    }));
-
-    const payload = {
-      numero_mesa: tableNumber, 
-      pin: pin,
-      items: itemsFormatted,
-      metodo_pago: paymentMethod // 'tarjeta' o 'efectivo'
-    };
-
-    const response = await api.post('api/movil/pedido', payload);
-    return response.data;
-
-  } catch (error) {
-    if (error.response && error.response.data) {
-      throw new Error(error.response.data.message);
-    }
-    throw new Error("Error de conexión al enviar el pedido.");
-  }
+export const sendOrder = async (restaurantId, tableId, pin, items, status) => {
+    const response = await fetch(`${API_URL}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurantId, tableId, pin, items, status })
+    });
+    if (!response.ok) throw new Error('Error al enviar pedido');
+    return await response.json();
 };
 
-// NUEVA FUNCIÓN: Pedir la cuenta (Cambia estado en el dashboard)
-export const requestBill = async (restaurantId, tableNumber, paymentMethod) => {
-  try {
-    const payload = {
-      restaurant_id: restaurantId,
-      numero_mesa: tableNumber,
-      metodo_pago: paymentMethod, // 'tarjeta' o 'efectivo'
-      accion: 'pedir_cuenta' 
-    };
-
-    // Ajusta esta ruta si tu backend usa otra URL para pedir la cuenta
-    // Si usas el mismo endpoint 'pedido' pero con otro flag, cámbialo aquí.
-    const response = await api.post('api/movil/cuenta', payload); 
-    return response.data;
-
-  } catch (error) {
-    console.error("Error pidiendo cuenta:", error);
-    // Lanzamos un error genérico para que el usuario no se asuste con detalles técnicos
-    throw new Error("No se pudo notificar al mesero. Intenta de nuevo.");
-  }
+// ESTA ES LA NUEVA FUNCIÓN PARA EL PAGO
+export const updateOrderStatus = async (orderId, newStatus, paymentMethod) => {
+    const response = await fetch(`${API_URL}/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            status: newStatus, 
+            metodo_pago: paymentMethod 
+        }),
+    });
+    if (!response.ok) throw new Error('Error al actualizar el estado de pago');
+    return await response.json();
 };

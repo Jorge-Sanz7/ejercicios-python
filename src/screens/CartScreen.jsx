@@ -1,72 +1,71 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { useCart } from '../context/CartContext';
 import CartItem from '../components/restaurant/CartItem';
 import { COLORS } from '../utils/constants';
-// Importamos la función actualizada
-import { sendOrder } from '../services/orders';
+import { sendOrder, updateOrderStatus } from '../services/orders';
 
-const CartScreen = ({ navigation, route }) => {
-  const { cartItems, total, clearCart } = useCart();
-  const { restaurantId, tableId: initialTableId } = route.params || {};
-
-  // Estados para la lógica del pedido
+const CartScreen = ({ navigation }) => {
+  const { cartItems, total, clearCart, restaurantData, activeOrder, setActiveOrder } = useCart();
   const [isPinModalVisible, setPinModalVisible] = useState(false);
   const [pin, setPin] = useState('');
-  const [tableNumber, setTableNumber] = useState(initialTableId ? String(initialTableId) : '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // NUEVO ESTADO: Controla qué método de pago eligió el usuario
-  const [paymentMethod, setPaymentMethod] = useState('tarjeta'); // valor por defecto
+  const [isFinishing, setIsFinishing] = useState(false);
 
-  const handleOrderRequest = () => {
+  const handleConfirmOrder = () => {
+    if (!restaurantData.restaurantId || !restaurantData.tableId) {
+      Alert.alert("Error", "Escanea el QR de nuevo, no detectamos tu mesa.", 
+        [{ text: "Ir a Escanear", onPress: () => navigation.navigate('QRScanner') }]);
+      return;
+    }
     setPinModalVisible(true);
   };
 
   const submitOrder = async () => {
-    // 1. Validaciones básicas
-    if (!tableNumber.trim()) {
-      Alert.alert("Falta información", "Por favor ingresa el número de mesa.");
-      return;
-    }
-    if (!pin || pin.length < 3) {
-      Alert.alert("Falta información", "Por favor ingresa un PIN válido.");
-      return;
-    }
-
+    if (pin.length < 3) return Alert.alert("Error", "Ingresa el PIN de la mesa.");
     setIsSubmitting(true);
     try {
-      // 2. Enviamos todo junto: Ubicación + Seguridad + Pago
-      // Nota: Pasamos 'paymentMethod' como último argumento
-      await sendOrder(restaurantId, tableNumber, pin, cartItems, paymentMethod);
-      
-      // 3. Éxito: Limpiamos y redirigimos
+      const response = await sendOrder(restaurantData.restaurantId, restaurantData.tableId, pin, cartItems, 'Pendiente');
+      setActiveOrder({ id: response.id_pedido || response.insertId, items: [...cartItems], total: total });
       setPinModalVisible(false);
-      clearCart(); 
-      Alert.alert(
-        "¡Pedido en camino! 🚀",
-        `La cocina ha recibido tu orden para la Mesa ${tableNumber}.`,
-        [{ text: "Entendido", onPress: () => navigation.navigate('Home') }]
-      );
-
-    } catch (error) {
-      Alert.alert("Hubo un problema", error.message || "No se pudo conectar con el restaurante.");
-    } finally {
-      setIsSubmitting(false);
-      setPin(''); 
-    }
+      Alert.alert("¡Pedido Enviado! 🚀", "Tu orden ya está en cocina.");
+    } catch (e) {
+      Alert.alert("Error", "No se pudo conectar con el servidor.");
+    } finally { setIsSubmitting(false); }
   };
 
-  const renderItem = ({ item }) => (
-    <CartItem item={item} />
-  );
-  
-  if (cartItems.length === 0) {
+  const handleYaTermine = () => {
+    Alert.alert(
+      "¿Pedir la cuenta?",
+      "Selecciona tu método de pago:",
+      [
+        { text: "Efectivo 💵", onPress: () => finalizarEnBD('Efectivo') },
+        { text: "Tarjeta 💳", onPress: () => finalizarEnBD('Tarjeta') },
+        { text: "Cancelar", style: "cancel" }
+      ]
+    );
+  };
+
+  const finalizarEnBD = async (metodo) => {
+    setIsFinishing(true);
+    try {
+      // Actualizamos la base de datos real
+      await updateOrderStatus(activeOrder.id, 'Esperando Pago', metodo);
+      
+      Alert.alert("¡Todo listo!", `El mesero viene con la cuenta. Pago: ${metodo}`, [
+        { text: "OK", onPress: () => { clearCart(); navigation.navigate('Home'); } }
+      ]);
+    } catch (e) {
+      Alert.alert("Error", "No pudimos actualizar tu estado de pago.");
+    } finally { setIsFinishing(false); }
+  };
+
+  if (cartItems.length === 0 && !activeOrder) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Aún no has agregado platillos 🍽️</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Ir al Menú</Text>
+        <Text style={styles.emptyText}>Carrito vacío 🍽️</Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backBtnText}>Volver</Text>
         </TouchableOpacity>
       </View>
     );
@@ -74,101 +73,31 @@ const CartScreen = ({ navigation, route }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>Tu Pedido 🛒</Text>
+      <Text style={styles.title}>{activeOrder ? "Orden en Proceso" : "Tu Pedido"}</Text>
+      <FlatList data={activeOrder ? activeOrder.items : cartItems} renderItem={({item}) => <CartItem item={item}/>} />
       
-      <FlatList
-        data={cartItems}
-        renderItem={renderItem}
-        keyExtractor={item => (item.id || item.productId).toString() + (item.notes || '')}
-        contentContainerStyle={styles.listContainer}
-      />
-      
-      {/* Footer con el total y botón de acción */}
       <View style={styles.footer}>
-        <View style={styles.totalsRow}>
-          <Text style={styles.totalLabel}>Total a Pagar:</Text>
-          <Text style={styles.totalAmount}>${total.toFixed(2)}</Text>
-        </View>
-
-        <TouchableOpacity style={styles.checkoutButton} onPress={handleOrderRequest}>
-          <Text style={styles.checkoutButtonText}>Confirmar Orden ✅</Text>
-        </TouchableOpacity>
+        <Text style={styles.totalText}>Total: ${total.toFixed(2)}</Text>
+        {!activeOrder ? (
+          <TouchableOpacity style={styles.mainBtn} onPress={handleConfirmOrder}>
+            <Text style={styles.btnText}>Confirmar Orden ✅</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={[styles.mainBtn, {backgroundColor: '#27AE60'}]} onPress={handleYaTermine} disabled={isFinishing}>
+            {isFinishing ? <ActivityIndicator color="#fff"/> : <Text style={styles.btnText}>¡YA terminé! (Pedir Cuenta) 🏁</Text>}
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* --- MODAL UNIFICADO (TODO EN UNO) --- */}
-      <Modal
-        visible={isPinModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setPinModalVisible(false)}
-      >
+      <Modal visible={isPinModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Finalizar Pedido 🔒</Text>
-            
-            {/* 1. Confirmar Mesa */}
-            <Text style={styles.inputLabel}>Número de Mesa:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ej. 5"
-              keyboardType="number-pad"
-              value={tableNumber}
-              onChangeText={setTableNumber}
-            />
-
-            {/* 2. Selección de Método de Pago */}
-            <Text style={styles.inputLabel}>¿Cómo deseas pagar?</Text>
-            <View style={styles.paymentSelector}>
-                <TouchableOpacity 
-                    style={[styles.paymentOption, paymentMethod === 'tarjeta' && styles.paymentOptionSelected]}
-                    onPress={() => setPaymentMethod('tarjeta')}
-                >
-                    <Text style={styles.paymentIcon}>💳</Text>
-                    <Text style={[styles.paymentText, paymentMethod === 'tarjeta' && styles.paymentTextSelected]}>Tarjeta</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                    style={[styles.paymentOption, paymentMethod === 'efectivo' && styles.paymentOptionSelected]}
-                    onPress={() => setPaymentMethod('efectivo')}
-                >
-                    <Text style={styles.paymentIcon}>💵</Text>
-                    <Text style={[styles.paymentText, paymentMethod === 'efectivo' && styles.paymentTextSelected]}>Efectivo</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* 3. PIN de Seguridad */}
-            <Text style={styles.inputLabel}>PIN del Mesero:</Text>
-            <TextInput
-              style={[styles.input, styles.pinInput]}
-              placeholder="***"
-              keyboardType="number-pad"
-              maxLength={4}
-              secureTextEntry={true}
-              value={pin}
-              onChangeText={setPin}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setPinModalVisible(false)}
-                disabled={isSubmitting}
-              >
-                <Text style={styles.modalButtonText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={submitOrder}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.modalButtonText}>Enviar a Cocina</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>PIN de Mesa {restaurantData.tableId}</Text>
+            <TextInput style={styles.input} placeholder="PIN" keyboardType="numeric" secureTextEntry value={pin} onChangeText={setPin} />
+            <TouchableOpacity style={styles.mainBtn} onPress={submitOrder}>
+              {isSubmitting ? <ActivityIndicator color="#fff"/> : <Text style={styles.btnText}>Confirmar</Text>}
+            </TouchableOpacity>
+            <Text style={{marginTop: 15}} onPress={() => setPinModalVisible(false)}>Cancelar</Text>
           </View>
         </View>
       </Modal>
@@ -177,54 +106,20 @@ const CartScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background, paddingTop: 50 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.primary, textAlign: 'center', marginBottom: 15 },
-  listContainer: { paddingBottom: 20 },
-  
-  // Footer mejorado
-  footer: { padding: 25, borderTopWidth: 1, borderTopColor: COLORS.border, backgroundColor: '#fff', elevation: 20 },
-  totalsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  totalLabel: { fontSize: 20, fontWeight: 'bold', color: COLORS.text },
-  totalAmount: { fontSize: 24, fontWeight: 'bold', color: COLORS.accent },
-  checkoutButton: { 
-    backgroundColor: COLORS.primary, padding: 18, borderRadius: 15, alignItems: 'center',
-    shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4.65, elevation: 8 
-  },
-  checkoutButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-
-  // Empty state
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
-  emptyText: { fontSize: 18, color: COLORS.secondaryText, marginBottom: 20 },
-  backButton: { backgroundColor: COLORS.primary, paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25 },
-  backButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-
-  // Estilos del Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '85%', backgroundColor: '#fff', borderRadius: 20, padding: 25, elevation: 10 },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.primary, marginBottom: 15, textAlign: 'center' },
-  
-  inputLabel: { fontSize: 14, fontWeight: '600', color: COLORS.secondaryText, marginBottom: 8, marginTop: 12 },
-  input: { backgroundColor: '#f5f5f5', borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, padding: 12, fontSize: 16, color: COLORS.text },
-  pinInput: { textAlign: 'center', letterSpacing: 8, fontSize: 24, fontWeight: 'bold' },
-
-  // Estilos del Selector de Pago (Visualmente claros)
-  paymentSelector: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  paymentOption: { 
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', 
-    padding: 12, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: '#fff' 
-  },
-  paymentOptionSelected: { 
-    borderColor: COLORS.success, backgroundColor: '#e8f8f5', borderWidth: 2 
-  },
-  paymentIcon: { fontSize: 20, marginRight: 8 },
-  paymentText: { fontWeight: '600', color: COLORS.secondaryText },
-  paymentTextSelected: { color: COLORS.success, fontWeight: 'bold' },
-
-  modalButtons: { flexDirection: 'row', marginTop: 25, gap: 15 },
-  modalButton: { flex: 1, padding: 15, borderRadius: 12, alignItems: 'center' },
-  cancelButton: { backgroundColor: '#e0e0e0' },
-  confirmButton: { backgroundColor: COLORS.success },
-  modalButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+  container: { flex: 1, backgroundColor: '#fff', paddingTop: 60 },
+  title: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  footer: { padding: 20, borderTopWidth: 1, borderColor: '#eee' },
+  totalText: { fontSize: 22, fontWeight: 'bold', marginBottom: 15 },
+  mainBtn: { backgroundColor: COLORS.primary, padding: 18, borderRadius: 15, alignItems: 'center' },
+  btnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { fontSize: 18, marginBottom: 20 },
+  backBtn: { backgroundColor: COLORS.primary, padding: 12, borderRadius: 10 },
+  backBtnText: { color: '#fff' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalBox: { width: '80%', backgroundColor: '#fff', padding: 25, borderRadius: 20, alignItems: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: 'bold' },
+  input: { borderBottomWidth: 1, width: '100%', marginVertical: 20, fontSize: 20, textAlign: 'center' }
 });
 
 export default CartScreen;
