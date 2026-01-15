@@ -11,10 +11,12 @@ const QRScannerScreen = ({ navigation }) => {
     const lockRef = useRef(false); 
 
     useEffect(() => {
-        if (permission && !permission.granted && permission.canAskAgain) {
-            requestPermission();
-        }
-    }, [permission]);
+        const unsubscribe = navigation.addListener('focus', () => {
+            setScanned(false);
+            lockRef.current = false;
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const handleBarCodeScanned = ({ data }) => {
         if (scanned || lockRef.current) return;
@@ -23,29 +25,34 @@ const QRScannerScreen = ({ navigation }) => {
         
         try {
             const parsedData = JSON.parse(data);
+            // Verificamos que el QR tenga los datos necesarios
             if (parsedData.id_restaurante) {
+                const resId = parsedData.id_restaurante;
                 const mesaId = parsedData.table_id || parsedData.mesa || "Mesa 1";
                 
-                // Guardamos en el cerebro de la app
-                setTableInfo(parsedData.id_restaurante, mesaId);
+                // Guardamos en el contexto
+                setTableInfo(resId, mesaId);
 
+                // Navegamos pasando el ID para que MenuScreen sepa qué cargar
                 navigation.navigate('Menu', { 
-                    restaurantId: parsedData.id_restaurante,
+                    restaurantId: resId,
                     tableId: mesaId 
                 });
-            } else { throw new Error("QR inválido"); }
+            } else {
+                throw new Error("QR sin ID de restaurante");
+            }
         } catch (error) {
-            Alert.alert("¡Error!", "Este código no es un QR de YA!", 
-                [{ text: "OK", onPress: () => { setScanned(false); lockRef.current = false; } }]);
+            Alert.alert("¡Error!", "Código QR no válido para YA!", 
+                [{ text: "Reintentar", onPress: () => { setScanned(false); lockRef.current = false; } }]);
         }
     };
 
     if (!permission || !permission.granted) {
         return (
             <View style={styles.container}>
-                <Text style={{color: '#fff', marginBottom: 20}}>Necesitamos permiso de la cámara</Text>
+                <Text style={styles.infoText}>Padrino, activa la cámara para pedir.</Text>
                 <TouchableOpacity style={styles.btn} onPress={requestPermission}>
-                    <Text style={{color: '#fff'}}>Dar Permiso</Text>
+                    <Text style={styles.btnText}>Permitir Cámara</Text>
                 </TouchableOpacity>
             </View>
         );
@@ -58,16 +65,29 @@ const QRScannerScreen = ({ navigation }) => {
                 onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
                 barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
             />
-            <View style={styles.overlay}><Text style={styles.overlayText}>Escanea el QR de tu mesa</Text></View>
+            <View style={styles.overlay}>
+                <View style={styles.frame}>
+                  <View style={styles.cornerTL} /><View style={styles.cornerTR} />
+                  <View style={styles.cornerBL} /><View style={styles.cornerBR} />
+                </View>
+                <Text style={styles.overlayText}>Escanea tu mesa</Text>
+            </View>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+    infoText: { color: '#fff', marginBottom: 20, textAlign: 'center' },
     btn: { backgroundColor: COLORS.primary, padding: 15, borderRadius: 10 },
-    overlay: { position: 'absolute', top: 100, backgroundColor: 'rgba(0,0,0,0.7)', padding: 15, borderRadius: 20 },
-    overlayText: { color: '#fff', fontSize: 18, fontWeight: 'bold' }
+    btnText: { color: '#fff', fontWeight: 'bold' },
+    overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', width: '100%' },
+    frame: { width: 250, height: 250, position: 'relative' },
+    cornerTL: { position: 'absolute', top: 0, left: 0, width: 40, height: 40, borderTopWidth: 5, borderLeftWidth: 5, borderColor: COLORS.primary },
+    cornerTR: { position: 'absolute', top: 0, right: 0, width: 40, height: 40, borderTopWidth: 5, borderRightWidth: 5, borderColor: COLORS.primary },
+    cornerBL: { position: 'absolute', bottom: 0, left: 0, width: 40, height: 40, borderBottomWidth: 5, borderLeftWidth: 5, borderColor: COLORS.primary },
+    cornerBR: { position: 'absolute', bottom: 0, right: 0, width: 40, height: 40, borderBottomWidth: 5, borderRightWidth: 5, borderColor: COLORS.primary },
+    overlayText: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginTop: 30, backgroundColor: 'rgba(0,0,0,0.5)', padding: 10, borderRadius: 10 }
 });
 
 export default QRScannerScreen;
