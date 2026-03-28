@@ -1,0 +1,257 @@
+import tkinter as tk
+from tkinter import messagebox, Toplevel, Listbox, END
+
+class ProtocoloKronos:
+    def __init__(self, maestro):
+        self.raiz = maestro
+        self.raiz.title("TERMINAL KRONOS - ACCESO RESTRINGIDO")
+        self.raiz.geometry("950x750")
+        self.raiz.configure(bg="#080808")
+
+        self.reg_personal = []
+        self.reg_accesos = []
+        self.reg_compras = []
+        self.reg_fallos = []
+        self.reg_sumas = []
+        self.reg_umbrales = []
+        self.reg_nominas = []
+
+        self.interfaz_seguridad()
+
+    def interfaz_seguridad(self):
+        self.capa_acceso = tk.Frame(self.raiz, bg="#080808")
+        self.capa_acceso.place(relx=0.5, rely=0.5, anchor="center")
+
+        tk.Label(self.capa_acceso, text="K R O N O S", font=("Courier", 45, "bold"), fg="#ff4500", bg="#080808").pack()
+        tk.Label(self.capa_acceso, text="PROYECTO DE ELIMINACIÓN - NIVEL 67", font=("Courier", 10), fg="#00d4ff", bg="#080808").pack(pady=10)
+
+        contenedor = tk.Frame(self.capa_acceso, bg="#080808", pady=20)
+        contenedor.pack()
+
+        # ID_USUARIO
+        tk.Label(contenedor, text="ID_USUARIO:", font=("Courier", 11), fg="#ff4500", bg="#080808").grid(row=0, column=0, sticky="e", padx=5)
+        self.ingreso_u = tk.Entry(contenedor, font=("Courier", 12), bg="#151515", fg="#00d4ff", insertbackground="#ff4500", borderwidth=0)
+        self.ingreso_u.grid(row=0, column=1, pady=5)
+        self.ingreso_u.insert(0, "kronos") # <--- Pone el usuario automáticamente
+
+        # CLAVE_ACCESO
+        tk.Label(contenedor, text="CLAVE_ACCESO:", font=("Courier", 11), fg="#ff4500", bg="#080808").grid(row=1, column=0, sticky="e", padx=5)
+        self.ingreso_p = tk.Entry(contenedor, font=("Courier", 12), bg="#151515", fg="#00d4ff", show="*", insertbackground="#ff4500", borderwidth=0)
+        self.ingreso_p.grid(row=1, column=1, pady=5)
+        self.ingreso_p.insert(0, "12345") # <--- Pone la contraseña automáticamente
+
+        tk.Button(self.capa_acceso, text="[ AUTENTICAR ]", command=self.verificar_credenciales, font=("Courier", 13, "bold"), 
+                  bg="#ff4500", fg="white", activebackground="#cc3a00", relief="flat", width=20, cursor="hand2").pack(pady=20)
+
+    def verificar_credenciales(self):
+        if self.ingreso_u.get() == "kronos" and self.ingreso_p.get() == "12345":
+            self.capa_acceso.destroy()
+            self.consola_mando()
+        else:
+            messagebox.showerror("ERROR CRÍTICO", "IDENTIDAD NO RECONOCIDA. INTRUSO DETECTADO.")
+
+    # ... (El resto de los métodos de la consola de mando se mantienen igual)
+    def consola_mando(self):
+        cuerpo = tk.Frame(self.raiz, bg="#080808")
+        cuerpo.pack(fill="both", expand=True, padx=50, pady=40)
+        encabezado = tk.Frame(cuerpo, bg="#080808")
+        encabezado.pack(fill="x")
+        tk.Label(encabezado, text="OPERACIÓN: KRONOS", font=("Courier", 26, "bold"), fg="#ff4500", bg="#080808").pack(side="left")
+        tk.Label(encabezado, text="SISTEMA_ACTIVO", font=("Courier", 10), fg="#00d4ff", bg="#080808").pack(side="right", pady=15)
+        tk.Frame(cuerpo, height=2, bg="#ff4500").pack(fill="x", pady=5)
+        rejilla = tk.Frame(cuerpo, bg="#080808")
+        rejilla.pack(pady=30)
+        tareas = [
+            ("ACTUALIZAR_SALARIOS", self.op_sueldos), ("REGISTRO_VISITANTES", self.op_parque),
+            ("ARCHIVO_VENTAS", self.op_tienda), ("FILTRO_MENOR_10", self.op_v10),
+            ("ESCANEO_RANGOS", self.op_vrango), ("AUDITORÍA_INTENTOS", self.op_vaudit),
+            ("SUMA_SECUENCIAL", self.op_suma_n), ("ACUMULADOR_DATOS", self.op_suma_acc),
+            ("UMBRAL_LÍMITE", self.op_suma_lim), ("NÓMINA_OPERARIOS", self.op_pagos)
+        ]
+        for idx, (nom, accion) in enumerate(tareas):
+            f, c = divmod(idx, 2)
+            btn = tk.Button(rejilla, text=f"> {nom}", command=accion, font=("Courier", 12),
+                           bg="#080808", fg="#00d4ff", activeforeground="#ff4500", activebackground="#101010",
+                           width=28, relief="flat", anchor="w", cursor="hand2")
+            btn.grid(row=f, column=c, padx=25, pady=12)
+
+    def crear_subpantalla(self, ref):
+        tw = Toplevel(self.raiz)
+        tw.title(f"SUB-SISTEMA: {ref}")
+        tw.geometry("420x550")
+        tw.configure(bg="#080808")
+        tk.Label(tw, text=f"// MÓDULO_{ref}", font=("Courier", 13, "bold"), fg="#ff4500", bg="#080808").pack(pady=20)
+        return tw
+
+    def entrada_estilo(self, w, etiqueta):
+        tk.Label(w, text=f"SOLICITUD_{etiqueta}:", font=("Courier", 9), fg="#00d4ff", bg="#080808").pack(anchor="w", padx=60)
+        e = tk.Entry(w, font=("Courier", 11), bg="#151515", fg="white", borderwidth=0, highlightthickness=1, highlightbackground="#333")
+        e.pack(pady=8, padx=60, fill="x")
+        return e
+
+    def op_sueldos(self):
+        w = self.crear_subpantalla("SALARIOS")
+        n = self.entrada_estilo(w, "NOMBRE")
+        s = self.entrada_estilo(w, "SUELDO")
+        def ejecutar():
+            try:
+                base = float(s.get())
+                final = base * (1.15 if base < 4000 else (1.10 if base <= 7000 else 1.08))
+                self.reg_personal.append({"id": n.get(), "val": final})
+                messagebox.showinfo("KRONOS", f"SALARIO ACTUALIZADO: ${final:,.2f}")
+            except: messagebox.showerror("ERROR", "VALOR NUMÉRICO REQUERIDO")
+        tk.Button(w, text="PROCESAR", command=ejecutar, bg="#ff4500", fg="white", font=("Courier", 10, "bold")).pack(pady=15)
+        tk.Button(w, text="LISTA", command=lambda: self.mostrar_datos(w, self.reg_personal), bg="#151515", fg="#00d4ff").pack()
+
+    def op_parque(self):
+        w = self.crear_subpantalla("VISITAS")
+        n = self.entrada_estilo(w, "SUJETO")
+        e = self.entrada_estilo(w, "EDAD")
+        j = self.entrada_estilo(w, "JUEGOS")
+        def analizar():
+            try:
+                edad, cant = int(e.get()), int(j.get())
+                tasa = 0.25 if edad < 10 else (0.10 if edad <= 17 else 0)
+                monto = (cant * 50) * (1 - tasa)
+                self.reg_accesos.append({"id": n.get(), "val": monto})
+                messagebox.showinfo("KRONOS", f"TOTAL ACCESO: ${monto:.2f}")
+            except: pass
+        tk.Button(w, text="REGISTRAR", command=analizar, bg="#ff4500", fg="white").pack(pady=15)
+        tk.Button(w, text="RECAUDACIÓN", command=lambda: messagebox.showinfo("TOTAL", f"RECAUDADO: ${sum(x['val'] for x in self.reg_accesos):.2f}")).pack()
+
+    def op_tienda(self):
+        w = self.crear_subpantalla("COMERCIO")
+        n = self.entrada_estilo(w, "CLIENTE")
+        m = self.entrada_estilo(w, "MES")
+        i = self.entrada_estilo(w, "IMPORTE")
+        def validar_venta():
+            mes = m.get().capitalize()
+            meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+            if mes not in meses: return messagebox.showwarning("ALERTA", "MES NO VÁLIDO")
+            try:
+                desc = {"Octubre": 0.15, "Diciembre": 0.20, "Julio": 0.10}.get(mes, 0)
+                final = float(i.get()) * (1 - desc)
+                self.reg_compras.append({"id": n.get(), "val": final})
+                messagebox.showinfo("KRONOS", f"VENTA FINAL: ${final:.2f}")
+            except: pass
+        tk.Button(w, text="CONFIRMAR", command=validar_venta, bg="#ff4500", fg="white").pack(pady=15)
+
+    def op_v10(self):
+        w = self.crear_subpantalla("FILTRO_10")
+        self.cont_10 = 0
+        e = self.entrada_estilo(w, "NÚMERO")
+        def checar():
+            self.cont_10 += 1
+            try:
+                if int(e.get()) < 10:
+                    messagebox.showinfo("KRONOS", f"VALIDADO EN {self.cont_10} INTENTOS")
+                    w.destroy()
+                else: messagebox.showerror("DENIED", "VALOR FUERA DE PARÁMETROS")
+            except: pass
+        tk.Button(w, text="TEST", command=checar, bg="#00d4ff").pack(pady=10)
+
+    def op_vrango(self):
+        w = self.crear_subpantalla("RANGO_0_20")
+        e = self.entrada_estilo(w, "ENTRADA")
+        def validar():
+            try:
+                if 0 <= int(e.get()) <= 20:
+                    messagebox.showinfo("KRONOS", "DENTRO DE RANGO")
+                    w.destroy()
+                else: messagebox.showwarning("ALERTA", "FUERA DE LÍMITES")
+            except: pass
+        tk.Button(w, text="VALIDAR", command=validar, bg="#00d4ff").pack(pady=10)
+
+    def op_vaudit(self):
+        w = self.crear_subpantalla("AUDITORÍA")
+        self.reg_fallos = []
+        e = self.entrada_estilo(w, "VALOR")
+        def grabar():
+            try:
+                v = int(e.get())
+                self.reg_fallos.append(v)
+                if 0 <= v <= 20:
+                    messagebox.showinfo("KRONOS", f"CORRECTO. FALLOS ANTERIORES: {len(self.reg_fallos)-1}\nHISTORIAL: {self.reg_fallos}")
+                    w.destroy()
+                else: e.delete(0, END)
+            except: pass
+        tk.Button(w, text="GRABAR", command=grabar, bg="#ff4500", fg="white").pack(pady=10)
+
+    def op_suma_n(self):
+        w = self.crear_subpantalla("SUMA_N")
+        e = self.entrada_estilo(w, "LIMITE_N")
+        def calcular():
+            try:
+                lim = int(e.get())
+                if lim > 0:
+                    res = sum(range(1, lim + 1))
+                    seq = " + ".join(str(i) for i in range(1, lim + 1))
+                    messagebox.showinfo("CÁLCULO", f"SERIE: {seq}\nTOTAL: {res}")
+                else: messagebox.showwarning("ERROR", "N DEBE SER POSITIVO")
+            except: pass
+        tk.Button(w, text="SUMAR", command=calcular, bg="#ff4500", fg="white").pack(pady=10)
+
+    def op_suma_acc(self):
+        w = self.crear_subpantalla("ACUMULADOR")
+        self.reg_sumas = []
+        e = self.entrada_estilo(w, "NÚMERO (0=FIN)")
+        def agregar():
+            try:
+                v = int(e.get())
+                if v == 0:
+                    messagebox.showinfo("FIN", f"ITEMS: {len(self.reg_sumas)}\nSUMA: {sum(self.reg_sumas)}\nLISTA: {self.reg_sumas}")
+                    w.destroy()
+                else:
+                    self.reg_sumas.append(v)
+                    e.delete(0, END)
+            except: pass
+        tk.Button(w, text="INSERTAR", command=agregar, bg="#00d4ff").pack(pady=10)
+
+    def op_suma_lim(self):
+        w = self.crear_subpantalla("UMBRAL_100")
+        self.reg_umbrales = []
+        e = self.entrada_estilo(w, "VALOR")
+        def empujar():
+            try:
+                self.reg_umbrales.append(int(e.get()))
+                total = sum(self.reg_umbrales)
+                if total > 100:
+                    messagebox.showinfo("LIMITE", f"SUPERADO: {total}\nCANTIDAD: {len(self.reg_umbrales)}\nDATOS: {self.reg_umbrales}")
+                    w.destroy()
+                else: e.delete(0, END)
+            except: pass
+        tk.Button(w, text="AÑADIR", command=empujar, bg="#ff4500", fg="white").pack(pady=10)
+
+    def op_pagos(self):
+        w = self.crear_subpantalla("NOMINA")
+        nom = self.entrada_estilo(w, "OPERARIO")
+        hn = self.entrada_estilo(w, "HORAS_N")
+        ph = self.entrada_estilo(w, "PAGO_H")
+        he = self.entrada_estilo(w, "HORAS_E")
+        hi = self.entrada_estilo(w, "HIJOS")
+        def liquidar():
+            try:
+                v_hn, v_ph, v_he, v_hi = int(hn.get()), float(ph.get()), int(he.get()), int(hi.get())
+                p_n = v_hn * v_ph
+                p_e = v_he * (v_ph * 1.5)
+                bono = (p_n + p_e) * 0.5 * v_hi
+                total = p_n + p_e + bono
+                self.reg_nominas.append({"id": nom.get(), "val": total})
+                messagebox.showinfo("LIQUIDACIÓN", f"PAGO TOTAL: ${total:,.2f}")
+            except: pass
+        tk.Button(w, text="CALCULAR", command=liquidar, bg="#ff4500", fg="white").pack(pady=10)
+        tk.Button(w, text="REPORTE", command=lambda: self.mostrar_datos(w, self.reg_nominas), bg="#151515", fg="#00d4ff").pack()
+
+    def mostrar_datos(self, padre, lista):
+        v_list = Toplevel(padre)
+        v_list.title("ARCHIVO_KRONOS")
+        v_list.configure(bg="#080808")
+        lb = Listbox(v_list, bg="#080808", fg="#00d4ff", font=("Courier", 10), borderwidth=0, highlightthickness=0)
+        lb.pack(fill="both", expand=True, padx=25, pady=25)
+        for d in lista:
+            lb.insert(END, f"ID: {d.get('id', 'N/A')} >> VALOR: ${d['val']:,.2f}")
+
+if __name__ == "__main__":
+    ventana = tk.Tk()
+    app = ProtocoloKronos(ventana)
+    ventana.mainloop()
